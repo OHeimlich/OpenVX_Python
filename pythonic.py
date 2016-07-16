@@ -413,6 +413,13 @@ def XorNode(graph, src1, src2, output=None):
     return output
 
 
+def OrNode(graph, src1, src2, output=None):
+    if output is None:
+        output = Image(graph, src1.get_width(), src2.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.OrNode(graph.graph, src1.image, src2.image, output.image)
+    return output
+
+
 def ChannelCombineNode(graph, plane1, plane2, plane3=None, plane4=None, output=None, color=None):
     if output is None:
         if color is None:
@@ -455,4 +462,39 @@ def ConvertDepthNode(graph, src_img, policy, output=None, color=None, scalar=Non
         scalar = Scalar(graph.vx_context, Data_type.VX_TYPE_INT32, 0)
     vx.ConvertDepthNode(graph.graph, src_img.image, output.image, policy, scalar._scalar)
     return output
+
+
+def AccumulateSquareImageNode(graph, src_img, alpha, accum=None):
+    if accum is None:
+        accum = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_S16)
+    vx.AccumulateSquareImageNode(graph.graph, src_img.image, alpha._scalar, accum.image)
+    return accum
+
+
+def AccumulateWeightedImageNode(graph, src_img, alpha, accum=None):
+    if accum is None:
+        accum = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.AccumulateWeightedImageNode(graph.graph, src_img.image, alpha._scalar, accum.image)
+    return accum
+
+
+def AddNode(graph, src_img, src_img2, policy, output):
+    if output is None:
+        if src_img.get_color() is 'DF_IMAGE_U8' and src_img2.get_color() is 'DF_IMAGE_U8':
+            output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+        else:
+            output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_S16)
+    vx.AddNode(graph.graph, src_img.image, src_img2.image, policy, output.image)
+    return output
+
+
+def SubtractNode(graph, src_img, src_img2, policy, output):
+    if output is None:
+        if src_img.get_color() is 'DF_IMAGE_U8' and src_img2.get_color() is 'DF_IMAGE_U8':
+            output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+        else:
+            output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_S16)
+    vx.SubtractNode(graph.graph, src_img.image, src_img2.image, policy, output.image)
+    return output
+
 # CannyEdgeDetectorNode
