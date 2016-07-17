@@ -319,6 +319,43 @@ class Scalar(Reference):
         return self._value
 
 
+class Lut(Reference):
+    def __init__(self, context, data_type, count):
+        self._lut = vx.CreateLUT(context, data_type, count)
+        self.data_typr = data_type
+        self.count = count
+        self.values = []
+
+    def get_lut(self):
+        return self.values
+
+    def set_values(self, values):
+        self.values = values
+        status, ptr = vx.AccessLUT(self._lut, None, vx.READ_AND_WRITE)
+        if status:
+            raise NameError('Failed to accessLUT')
+        for v, i in zip(values, range(len(ptr))):
+            ptr[i] = v
+        vx.CommitLUT(self._lut, ptr)
+
+
+class Convolution(Reference):
+    def __init__(self, context, columns, rows):
+        self._convolution = vx.CreateConvolution(context, columns=columns, rows=rows)
+        self.array = None
+    def get_convolution(self):
+        return vx.ReadConvolutionCoefficients(self._convolution, self.array)
+
+    def set_convolution(self, array):
+        """
+        needs to be fix!
+        :param array:
+        :return:
+        """
+        return vx.WriteConvolutionCoefficients(self._convolution, array)
+
+
+
 def Sobel3x3Node(graph, input_img, output_x=None, output_y=None):
         if output_x is None:
             output_x = Image(graph, input_img.get_width(), input_img.get_height())
@@ -497,4 +534,73 @@ def SubtractNode(graph, src_img, src_img2, policy, output):
     vx.SubtractNode(graph.graph, src_img.image, src_img2.image, policy, output.image)
     return output
 
-# CannyEdgeDetectorNode
+
+def Dilate3x3Node(graph, src_img, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.Dilate3x3Node(graph.graph, src_img.image, output.image)
+    return output
+
+
+def Erode3x3Node(graph, src_img, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.Erode3x3Node(graph.graph, src_img.image, output.image)
+    return output
+
+
+def Median3x3Node(graph, src_img, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.Median3x3Node(graph.graph, src_img.image, output.image)
+    return output
+
+
+def MeanStdDevNode(graph, src_img, mean, stddev):
+    if mean is None:
+        mean = Scalar(graph.vx_context, Data_type.VX_TYPE_FLOAT32, 0)
+    if stddev is None:
+        stddev = Scalar(graph.vx_context, Data_type.VX_TYPE_FLOAT32, 0)
+    vx.MeanStdDevNode(graph.graph, src_img.image, mean._scalar, stddev._scalar)
+    return mean, stddev
+
+
+def TableLookupNode(graph, src_img, lut, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.TableLookupNode(graph.graph, src_img.image, lut._lut, output.image)
+    return output
+
+
+def ConvolveNode(graph, src_img, conv, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_S16)
+    vx.ConvolveNode(graph.graph, src_img.image, conv._convolution, output.image)
+    return output
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
