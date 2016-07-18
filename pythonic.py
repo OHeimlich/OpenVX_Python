@@ -1,5 +1,6 @@
 from pyvx import vx
 from pyvx.backend import lib, ffi
+import array
 import logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -85,6 +86,20 @@ class Data_type(object):
     VX_TYPE_META_FORMAT = vx.TYPE_META_FORMAT
     VX_TYPE_OBJECT_MAX = vx.TYPE_OBJECT_MAX
 
+class Policy(object):
+    VX_CONVERT_POLICY_WRAP = vx.CONVERT_POLICY_WRAP
+    VX_CONVERT_POLICY_SATURATE = vx.CONVERT_POLICY_SATURATE
+    VX_ROUND_POLICY_TO_ZERO = vx.ROUND_POLICY_TO_ZERO
+    VX_ROUND_POLICY_TO_NEAREST_EVEN = vx.ROUND_POLICY_TO_NEAREST_EVEN
+
+class Interpolation(object):
+    VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR = vx.INTERPOLATION_TYPE_NEAREST_NEIGHBOR
+    VX_INTERPOLATION_TYPE_BILINEAR = vx.INTERPOLATION_TYPE_BILINEAR
+    VX_INTERPOLATION_TYPE_AREA = vx.INTERPOLATION_TYPE_AREA
+
+class Scale(object):
+    SCALE_PYRAMID_HALF = vx.SCALE_PYRAMID_HALF
+    SCALE_PYRAMID_ORB = vx.SCALE_PYRAMID_ORB
 
 class Reference(object):
     def __init__(self):
@@ -311,7 +326,7 @@ class Threshold(Reference):
 class Scalar(Reference):
 
     def __init__(self, context, data_type, value):
-        self._scalar = vx.CreateScalar(context, data_type, value)
+        self._scalar = vx.CreateScalar(context.vx_context, data_type, value)
         self._value = value
         self._type = data_type
 
@@ -321,7 +336,7 @@ class Scalar(Reference):
 
 class Lut(Reference):
     def __init__(self, context, data_type, count):
-        self._lut = vx.CreateLUT(context, data_type, count)
+        self._lut = vx.CreateLUT(context.vx_context, data_type, count)
         self.data_typr = data_type
         self.count = count
         self.values = []
@@ -341,7 +356,7 @@ class Lut(Reference):
 
 class Convolution(Reference):
     def __init__(self, context, columns, rows):
-        self._convolution = vx.CreateConvolution(context, columns=columns, rows=rows)
+        self._convolution = vx.CreateConvolution(context.vx_context, columns=columns, rows=rows)
         self.array = None
     def get_convolution(self):
         return vx.ReadConvolutionCoefficients(self._convolution, self.array)
@@ -354,6 +369,44 @@ class Convolution(Reference):
         """
         return vx.WriteConvolutionCoefficients(self._convolution, array)
 
+
+class Matrix(Reference):
+    def __init__(self, data_type, context, columns, rows):
+        self.columns= columns
+        self.rows = rows
+        self.data_type = data_type
+        self.data = None
+        self._matrix = vx.CreateMatrix(context.vx_context, data_type, columns, rows)
+
+    def set_array(self):
+        if self.data_type is Data_type.VX_TYPE_FLOAT32:
+            self.data = array.array('f')
+        else:
+            self.data = array.array('l')
+        for i in range(0, self.columns*self.rows):
+            self.data.append(-1)
+
+    def get_matrix(self):
+        vx.ReadMatrix(self._matrix, self.data)
+        return self.data
+
+    def set_matrix(self, matrix_values):
+        for val, i in zip(matrix_values, range(0, len(matrix_values))):
+            self.data[i] = val
+        vx.WriteMatrix(self._matrix, self.data)
+
+
+class Pyramid(Reference):
+    def __init__(self, context_graph, levels, scale, width, height, image_format, virtual=False):
+        self.levels = levels
+        self.scale = scale
+        self.width = width
+        self.height = height
+        self.format = image_format
+        if virtual:
+            self._pyramid = vx.CreatePyramid(context_graph.vx_context, levels, scale, width, height, image_format)
+        else:
+            self._pyramid = vx.CreatePyramid(context_graph.graph, levels, scale, width, height, image_format)
 
 
 def Sobel3x3Node(graph, input_img, output_x=None, output_y=None):
@@ -579,20 +632,54 @@ def ConvolveNode(graph, src_img, conv, output = None):
     return output
 
 
+def HalfScaleGaussianNode(graph, src_img, output = None, kernel_size=3):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.HalfScaleGaussianNode(graph.graph, src_img.image, output.image, kernel_size)
+    return output
 
 
+def ScaleImageNode(graph, src_img, output = None, interpolation=Interpolation.VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height())
+    vx.ScaleImageNode(graph.graph, src_img.image, output.image, interpolation)
+    return output
 
 
+def WarpAffineNode(graph, src_img, matrix, interpolation, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.WarpAffineNode(graph.graph, src_img.image, matrix._matrix, interpolation, output.image)
+    return output
 
 
+def WarpPerspectiveNode(graph, src_img, matrix, interpolation, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.WarpPerspectiveNode(graph.graph, src_img.image, matrix._matrix, interpolation, output.image)
+    return output
 
 
+def MultiplyNode(graph, src_img1, src_img2, scale, overflow_policy, rounding_policy, output = None):
+    if output is None:
+        if src_img1.get_color() is 'DF_IMAGE_U8' and src_img2.get_color() is 'DF_IMAGE_U8':
+            output = Image(graph, src_img1.get_width(), src_img1.get_height(), Color.VX_DF_IMAGE_U8)
+        else:
+            output = Image(graph, src_img1.get_width(), src_img1.get_height(), Color.VX_DF_IMAGE_S16)
+    vx.MultiplyNode(graph.graph, src_img1.image, scale._scalar, overflow_policy, rounding_policy, output.image)
+    return output
 
 
+def GaussianPyramidNode(graph, src_img, gaussian):
+    vx.GaussianPyramidNode(graph.graph, src_img.image, gaussian)
+    return gaussian
 
 
-
-
+def IntegralImageNode(graph, src, output=None):
+    if output is None:
+        output = Image(graph, src.get_width(), src.get_height(), Color.VX_DF_IMAGE_U32)
+    vx.IntegralImageNode(graph.graph, src.image, output.image)
+    return output
 
 
 
