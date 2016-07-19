@@ -101,6 +101,10 @@ class Scale(object):
     SCALE_PYRAMID_HALF = vx.SCALE_PYRAMID_HALF
     SCALE_PYRAMID_ORB = vx.SCALE_PYRAMID_ORB
 
+class Norm(object):
+    NORM_L1 = vx.NORM_L1
+    NORM_L2 = vx.NORM_L2
+
 class Reference(object):
     def __init__(self):
         self.vx_ref = None
@@ -404,10 +408,25 @@ class Pyramid(Reference):
         self.height = height
         self.format = image_format
         if virtual:
-            self._pyramid = vx.CreatePyramid(context_graph.vx_context, levels, scale, width, height, image_format)
+            self._pyramid = vx.CreateVirtualPyramid(context_graph.vx_context, levels, scale, width, height, image_format)
         else:
             self._pyramid = vx.CreatePyramid(context_graph.graph, levels, scale, width, height, image_format)
 
+
+class Array(Reference):
+    def __init__(self, context, item_type, capacity):
+        self.item_type = item_type
+        self.capacity = capacity
+        self._array = vx.CreateArray(context.vx_context, item_type, capacity)
+
+    def get_array(self):
+        pass
+
+    def set_array(self):
+        pass
+
+    def add_array_item(self, count, elements, stride=1):
+        pass
 
 def Sobel3x3Node(graph, input_img, output_x=None, output_y=None):
         if output_x is None:
@@ -681,6 +700,12 @@ def IntegralImageNode(graph, src, output=None):
     vx.IntegralImageNode(graph.graph, src.image, output.image)
     return output
 
+
+def CannyEdgeDetectorNode(graph, src_img, hyst, gradient_size, norm_type, output = None):
+    if output is None:
+        output = Image(graph, src_img.get_width(), src_img.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.CannyEdgeDetectorNode(graph.graph, src_img.image, hyst.threshold, gradient_size, norm_type, output.image)
+    return output
 
 
 
