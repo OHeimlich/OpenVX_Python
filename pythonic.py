@@ -748,7 +748,7 @@ def MinMaxLocNode(graph, src_img, min_val=None, max_val=None, min_loc=None, max_
     if min_count is None:
         min_count = Scalar(graph.vx_context, Data_type.VX_TYPE_UINT32)
     if max_count is None:
-       max_count = Scalar(graph.vx_context, Data_type.VX_TYPE_UINT32)
+        max_count = Scalar(graph.vx_context, Data_type.VX_TYPE_UINT32)
     vx.MinMaxLocNode(graph.graph, src_img.image, min_val._scalar, max_val._scalar, min_loc._array, max_loc._array, min_count._scalar, max_count._scalar)
 
 
