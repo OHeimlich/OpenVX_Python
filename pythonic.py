@@ -182,7 +182,7 @@ class Graph(Reference):
         else:
             self.graph = vx.CreateGraph(ctx.vx_context)
             self.vx_ref = vx.reference(self.graph)
-                self.context = ctx
+            self.context = ctx
             self.vx_context = ctx.get_context()
 
     def __enter__(self):
@@ -422,11 +422,21 @@ class Array(Reference):
     def get_array(self):
         pass
 
-    def set_array(self):
-        pass
+    def add_item(self, count, elements, stride=0):
+        items = array.array('l')
+        for i in elements:
+            items.append(i)
+        print vx.AddArrayItems(self._array, count, items, stride)
 
-    def add_array_item(self, count, elements, stride=1):
-        pass
+
+class Remap(Reference):
+    def __init__(self, context, src_width, src_height, dst_width, dst_height):
+        self.src_width = src_width
+        self.src_height =src_height
+        self.dst_width = dst_width
+        self.dst_height = dst_height
+        self._remap = vx.CreateRemap(context.vx_context, src_width, src_height, dst_width, dst_height)
+
 
 def Sobel3x3Node(graph, input_img, output_x=None, output_y=None):
         if output_x is None:
@@ -708,11 +718,50 @@ def CannyEdgeDetectorNode(graph, src_img, hyst, gradient_size, norm_type, output
     return output
 
 
+def FastCornersNode(graph, src_img, threshold, nonmax_suppression, num_of_corners_to_detect, corners=None, num_corners=None):
+    if corners is None:
+        corners = Array(graph.vx_context, Data_type.VX_TYPE_KEYPOINT, num_of_corners_to_detect)
+    if num_corners is None:
+        num_corners = Scalar(graph.vx_context, Data_type.VX_TYPE_SIZE)
+    vx.FastCornersNode(graph.graph, src_img.image, threshold._scalar, nonmax_suppression, corners._array, num_corners._scalar)
+    return corners, num_corners
 
 
+def HarrisCornersNode(graph, src_img, threshold, min_distance, sensitivity, gradient_size, block_size, num_of_corners_to_detect, corners=None, num_corners=None):
+    if corners is None:
+        corners = Array(graph.vx_context, Data_type.VX_TYPE_KEYPOINT, num_of_corners_to_detect)
+    if num_corners is None:
+        num_corners = Scalar(graph.vx_context, Data_type.VX_TYPE_SIZE)
+    vx.HarrisCornersNode(graph.graph, src_img.image, threshold._scalar, min_distance._scalar, sensitivity._scalar, gradient_size, block_size, corners._array, num_corners._scalar)
+    return corners, num_corners
 
 
+def MinMaxLocNode(graph, src_img, min_val=None, max_val=None, min_loc=None, max_loc=None, min_count=None, max_count=None):
+    if min_val is None:
+        min_val = Scalar(graph.vx_context, Data_type.VX_TYPE_INT16)
+    if max_val is None:
+        max_val = Scalar(graph.vx_context, Data_type.VX_TYPE_INT16)
+    if min_loc is None:
+        min_loc = Array(graph.vx_context, Data_type.VX_TYPE_COORDINATES2D, 100)
+    if max_loc is None:
+        max_loc = Array(graph.vx_context, Data_type.VX_TYPE_COORDINATES2D, 100)
+    if min_count is None:
+        min_count = Scalar(graph.vx_context, Data_type.VX_TYPE_UINT32)
+    if max_count is None:
+       max_count = Scalar(graph.vx_context, Data_type.VX_TYPE_UINT32)
+    vx.MinMaxLocNode(graph.graph, src_img.image, min_val._scalar, max_val._scalar, min_loc._array, max_loc._array, min_count._scalar, max_count._scalar)
 
+
+def OpticalFlowPyrLKNode(graph, old_images, new_images, old_points, new_points_estimates, new_points, termination,epsilon, num_iterations, use_initial_estimate, window_dimension):
+    vx.OpticalFlowPyrLKNode(graph.graph, old_images._pyramid, new_images._pyramid, old_points._array, new_points_estimates._array, new_points._array, termination,
+epsilon._scalar, num_iterations._scalar, use_initial_estimate._scalar, window_dimension)
+
+
+def RemapNode(graph, src1, src2, table, policy, output=None):
+    if output is None:
+        output = Image(graph, src1.get_width(), src1.get_height(), Color.VX_DF_IMAGE_U8)
+    vx.RemapNode(graph.graph, src1.image, src2.image,table._remap, policy, output.image)
+    return output
 
 
 
